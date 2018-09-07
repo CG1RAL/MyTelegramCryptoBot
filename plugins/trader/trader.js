@@ -7,8 +7,6 @@ const moment = require('moment');
 const log = require(dirs.core + 'log');
 const Broker = require(dirs.gekko + '/exchange/gekkoBroker');
 
-require(dirs.gekko + '/exchange/dependencyCheck');
-
 const Trader = function(next) {
 
   _.bindAll(this);
@@ -21,17 +19,14 @@ const Trader = function(next) {
 
   this.propogatedTrades = 0;
 
-  try {
-    this.broker = new Broker(this.brokerConfig);
-  } catch(e) {
-    util.die(e.message);
-  }
+  this.broker = new Broker(this.brokerConfig);
 
   if(!this.broker.capabilities.gekkoBroker) {
     util.die('This exchange is not yet supported');
   }
 
   this.sync(() => {
+    this.setBalance();
     log.info('\t', 'Portfolio:');
     log.info('\t\t', this.portfolio.currency, this.brokerConfig.currency);
     log.info('\t\t', this.portfolio.asset, this.brokerConfig.asset);
@@ -64,7 +59,6 @@ Trader.prototype.sync = function(next) {
     const oldPortfolio = this.portfolio;
 
     this.setPortfolio();
-    this.setBalance();
 
     if(this.sendInitialPortfolio && !_.isEqual(oldPortfolio, this.portfolio)) {
       this.relayPortfolioChange();
@@ -202,7 +196,7 @@ Trader.prototype.processAdvice = function(advice) {
       });
     }
 
-    amount = this.portfolio.asset;
+    amount = this.portfolio.asset * 0.95;
 
     log.info(
       'Trader',
@@ -225,7 +219,7 @@ Trader.prototype.createOrder = function(side, amount, advice, id) {
   const check = this.broker.isValidOrder(amount, this.price);
 
   if(!check.valid) {
-    log.warn('NOT creating order! Reason:', check.reason);
+    log.debug('NOT creating order! Reason:', check.reason);
     return this.deferredEmit('tradeAborted', {
       id,
       adviceId: advice.id,
@@ -248,7 +242,7 @@ Trader.prototype.createOrder = function(side, amount, advice, id) {
 
   this.order = this.broker.createOrder(type, side, amount);
 
-  this.order.on('fill', f => log.info('[ORDER] partial', side, 'fill, total filled:', f));
+  this.order.on('filled', f => log.info('[ORDER] partial', side, ' fill, total filled:', f));
   this.order.on('statusChange', s => log.debug('[ORDER] statusChange:', s));
 
   this.order.on('error', e => {
@@ -267,20 +261,6 @@ Trader.prototype.createOrder = function(side, amount, advice, id) {
   });
   this.order.on('completed', () => {
     this.order.createSummary((err, summary) => {
-      if(!err && !summary) {
-        err = new Error('GB returned an empty summary.')
-      }
-
-      if(err) {
-        log.error('Error while creating summary:', err);
-        return this.deferredEmit('tradeErrored', {
-          id,
-          adviceId: advice.id,
-          date: moment(),
-          reason: err.message
-        });
-      }
-
       log.info('[ORDER] summary:', summary);
       this.order = null;
       this.sync(() => {
@@ -298,7 +278,7 @@ Trader.prototype.createOrder = function(side, amount, advice, id) {
             effectivePrice = summary.price * (1 - summary.feePercent / 100);
           }
         } else {
-          log.warn('WARNING: exchange did not provide fee information, assuming no fees..');
+          log.debug('WARNING: exchange did not provide fee information, assuming no fees..');
           effectivePrice = summary.price;
         }
 
@@ -340,6 +320,54 @@ Trader.prototype.cancelOrder = function(id, advice, next) {
     });
     this.sync(next);
   });
+}
+
+// Trader.prototype.processCommand = function(command) {
+//   this.manager.processCommand(command);
+// }
+
+Trader.prototype.processCommand = function (cmd) {
+  
+  if (cmd.command == 'portfolio') {
+    cmd.handled = true;
+
+    this.setTicker(() => {
+      var message = "Portfolio:\n";
+      var value = 0.0;
+      var price = this.ticker.bid;
+      _.each(this.portfolio, function (fund) {
+        var isAsset = fund.name == config.watch.asset;
+        var amount = parseFloat(fund.amount);
+        message += fund.name + ': ' + amount.toFixed(isAsset ? 6 : 2) + "\n";
+        if (isAsset) {
+          value += amount * price;
+        } else {
+          value += amount;
+        }
+      }.bind(this));
+
+      message += "\nTotal value: " + value.toFixed(2);
+      log.remote(message);
+
+    });
+  }
+  else if (cmd.command == 'price') {
+    cmd.handled = true;
+
+    var logPrice = function() {
+      var message = ['Current price at ', config.watch.exchange, ' ',
+        config.watch.currency, '/', config.watch.asset, ' is ',
+        this.ticker.bid, ' ', config.watch.currency, ' (bid) ',
+        this.ticker.ask, ' ', config.watch.currency, ' (ask) ',
+        this.candlePrice, ' ', config.watch.currency, ' (candle close, ', this.candlePriceTime.fromNow(),
+        ')'
+      ].join('');
+
+      log.remote(message);
+    }.bind(this);
+
+    this.setTicker(logPrice);
+  }
 }
 
 module.exports = Trader;
