@@ -94,6 +94,11 @@ var subscriptions = [
     event: 'roundtrip',
     handler: 'processRoundtrip'
   },
+  {
+    emitter: 'telegrambot',
+    event: 'command',
+    handler: 'processCommand'
+  }
 ];
 
 module.exports = subscriptions;

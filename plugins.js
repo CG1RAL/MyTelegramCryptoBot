@@ -61,6 +61,7 @@ var plugins = [
     slug: 'telegrambot',
     async: false,
     modes: ['realtime'],
+    emits: ['command'],
     dependencies: [{
       module: 'node-telegram-bot-api',
       version: '0.24.0'
@@ -165,11 +166,7 @@ var plugins = [
     description: 'Sends advice to pushbullet.',
     slug: 'pushbullet',
     async: false,
-    modes: ['realtime'],
-    dependencies: [{
-      module: 'pushbullet',
-      version: '1.4.3'
-    }]
+    modes: ['realtime']
   },
   {
     name: 'Kodi',
@@ -183,22 +180,14 @@ var plugins = [
     description: 'Sends trades to twitter.',
     slug: 'twitter',
     async: false,
-    modes: ['realtime'],
-    dependencies: [{
-      module: 'twitter',
-      version: '1.7.1'
-    }]
+    modes: ['realtime']
   },
   {
     name: 'Slack',
     description: 'Sends trades to slack channel.',
     slug: 'slack',
     async: false,
-    modes: ['realtime'],
-    dependencies: [{
-      module: '@slack/client',
-      version: '3.13.0'
-    }]
+    modes: ['realtime']
   },
   {
     name: 'IFTTT',
