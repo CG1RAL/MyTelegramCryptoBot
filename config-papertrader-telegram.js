@@ -208,7 +208,7 @@ config.ircbot = {
 config.telegrambot = {
   enabled: true,
   emitUpdates: true,
-  token: '670006847:AAHLUL1bol9J489mD_rWszKdp8FTj2A5fd4', // Talk to botFather on Telegram to get your token and bot name
+  token: '', // Talk to botFather on Telegram to get your token and bot name
   botName: 'MyTelegramCryptoBot'
 };
 
